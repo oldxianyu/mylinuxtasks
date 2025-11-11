@@ -6,7 +6,7 @@
 PORT=9002
 SERVER_NAME="file-server"
 WORK_DIR="/vol1/1000/work"
-TITLE="xianyu下载站"
+TITLE="Xianyu"
 
 echo "🔄 检查 docker 是否已安装..."
 if ! command -v docker &> /dev/null; then
