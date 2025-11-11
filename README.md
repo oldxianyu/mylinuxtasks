@@ -3,24 +3,28 @@
 ## 自己摸索的 Linux 一些简化操作
 
 ---
-
-### wg_ui_manage.sh
-一键安装或卸载 WireGuard。  
-当前适配系统为 **Ubuntu 22**，其他系统请自行测试。
-
----
-
 ### GitHub 加速站
 使用地址：  
 ```
 github.502211.xyz
 ```
+---
+### wg_ui_manage.sh
+一键安装或卸载 WireGuard。  
+当前适配系统为 **Ubuntu 22**，其他系统请自行测试。
+
+### 一键安装 WireGuard + Web UI
+bash <(wget -qO- https://github.502211.xyz/https://raw.githubusercontent.com/oldxianyu/mylinuxtasks/main/wg_ui_manage.sh)
 
 ---
 
 ### install_file_server.sh
 一键生成简易文件下载站（Docker 版本）。  
 适用于已安装 Docker 的系统，推荐环境为 **飞牛 NAS（Ubuntu 22）**。
+
+### 一键安装 file_server
+
+bash <(wget -qO- https://github.502211.xyz/https://raw.githubusercontent.com/oldxianyu/mylinuxtasks/main/install_file_server.sh)
 
 #### 默认参数
 ```
