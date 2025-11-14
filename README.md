@@ -18,6 +18,17 @@ bash <(wget -qO- https://raw.githubusercontent.com/oldxianyu/mylinuxtasks/main/w
 ### 国内加速版
 bash <(wget -qO- https://github.502211.xyz/https://raw.githubusercontent.com/oldxianyu/mylinuxtasks/main/wg_ui_manage.sh)
 
+#### 这个UI 配置好像有问题 需要手动在UI界面再改一下配置
+<img width="1066" height="604" alt="image" src="https://github.com/user-attachments/assets/cbeb014e-3945-4d9e-89be-21b069517434" />
+
+#### 开启 IP 转发和 NAT
+修改下面的配置：（ip可以自定义， eth0 是网口，可能需要更改）
+Server Interface Addresses： 10.8.0.1/24 
+Post Up Script：
+sysctl -w net.ipv4.ip_forward=1; iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+Post Down Script：
+iptables -t nat -D POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+
 ---
 
 ### install_file_server.sh
