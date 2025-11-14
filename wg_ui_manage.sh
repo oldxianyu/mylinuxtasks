@@ -14,18 +14,12 @@ SMTP_PASSWORD="Ps1234"
 SMTP_AUTH_TYPE="LOGIN"
 SMTP_ENCRYPTION="SSL"
 
-# 获取 QQ 邮箱授权码（重点）
-# 1️⃣ 登录 QQ 邮箱网页（https://mail.qq.com）
-# 2️⃣ 点击右上角齿轮 → 账号 → 找到「POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV服务」
-# 3️⃣ 开启「SMTP服务」
-# 4️⃣ 系统会弹出一个窗口，提示发送短信验证码验证。
-# 5️⃣ 验证通过后，会显示一个 16 位的授权码（如 qwertyuiopasdfgh）
-# ⚠️ 这就是脚本里 SMTP_PASSWORD 的值。
-
 # WireGuard 配置
 WG_INTERFACE="wg0"
 WG_ADDRESS="10.8.0.1/24"
 WG_PORT="51820"
+WG_NETMASK="10.8.0.0/24"
+WG_NETCARD="eth0"  # 公网网卡名，按实际修改
 
 # ==== 选择操作 ====
 echo "请选择操作："
@@ -36,8 +30,7 @@ read -rp "请输入 1 或 2: " ACTION
 if [[ "$ACTION" == "1" ]]; then
     echo "=== 开始部署 ==="
 
-    # ==== 安装依赖和检查 wg 命令 ====
-    echo "=== 安装依赖 ==="
+    # ==== 安装依赖 ====
     apt update
     apt install -y wget tree qrencode
 
@@ -50,11 +43,10 @@ if [[ "$ACTION" == "1" ]]; then
     WG_PRIVATE_KEY=$(wg genkey)
     WG_PUBLIC_KEY=$(echo "$WG_PRIVATE_KEY" | wg pubkey)
 
-    # ==== 下载 WireGuard-UI（使用加速源） ====
+    # ==== 下载 WireGuard-UI ====
     echo "=== 下载 WireGuard-UI ==="
     mkdir -p /opt/wireguard-ui
-    WGET_CMD=$(which wget)
-    $WGET_CMD -O /opt/wireguard-ui.tar.gz --max-redirect=20 \
+    wget -O /opt/wireguard-ui.tar.gz --max-redirect=20 \
       "https://github.502211.xyz/https://github.com/ngoduykhanh/wireguard-ui/releases/download/${WG_UI_VERSION}/wireguard-ui-${WG_UI_VERSION}-linux-amd64.tar.gz"
 
     tar -zxvf /opt/wireguard-ui.tar.gz -C /opt/wireguard-ui/
@@ -79,13 +71,18 @@ EOF
 Address = ${WG_ADDRESS}
 ListenPort = ${WG_PORT}
 PrivateKey = ${WG_PRIVATE_KEY}
+MTU = 1420
 SaveConfig = true
+PostUp = sysctl -w net.ipv4.ip_forward=1; iptables -t nat -A POSTROUTING -s ${WG_NETMASK} -o ${WG_NETCARD} -j MASQUERADE
+PostDown = iptables -t nat -D POSTROUTING -s ${WG_NETMASK} -o ${WG_NETCARD} -j MASQUERADE
+Table = auto
 
 # 示例客户端
 # [Peer]
 # PublicKey = <client_public_key>
 # AllowedIPs = 10.8.0.2/32
 EOF
+
     chmod 600 /etc/wireguard/${WG_INTERFACE}.conf
 
     # ==== 创建 systemd 服务 ====
