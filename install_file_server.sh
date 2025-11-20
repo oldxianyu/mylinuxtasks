@@ -6,7 +6,7 @@
 
 PORT=9002
 SERVER_NAME="file-server"
-WORK_DIR="/vol1/1000/work"
+WORK_DIR="/vol2/1000/work"
 SHORT_CMD="wenjian"
 NGINX_CONF="/opt/file_server_nginx.conf"
 
