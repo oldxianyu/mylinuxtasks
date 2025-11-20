@@ -1,17 +1,26 @@
 #!/bin/bash
 
+# ==========================
+# Xianyu 文件下载站安装脚本（纯默认 Index of）
+# ==========================
+
 PORT=9002
 SERVER_NAME="file-server"
 WORK_DIR="/vol1/1000/work"
-TITLE="Xianyu"
-
+SHORT_CMD="wenjian"
 NGINX_CONF="/opt/file_server_nginx.conf"
+
+echo "=== 检查 Docker ==="
+if ! command -v docker &> /dev/null; then
+    echo "Docker 未安装，退出"
+    exit 1
+fi
 
 echo "=== 创建文件目录 ==="
 mkdir -p "$WORK_DIR"
 chmod -R 755 "$WORK_DIR"
 
-echo "=== 写入 nginx 配置 ==="
+echo "=== 写入 Nginx 配置（使用默认 Index of）==="
 cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
@@ -20,13 +29,11 @@ server {
 
     location / {
         root /usr/share/nginx/html;
-        sub_filter 'Index of /' '$TITLE';
-        sub_filter_once off;
     }
 }
 EOF
 
-echo "=== 拉取 nginx 镜像 ==="
+echo "=== 拉取最新 nginx 镜像 ==="
 docker pull nginx:latest
 
 echo "=== 删除旧容器（如果有） ==="
@@ -41,22 +48,38 @@ docker run -d \
     --restart unless-stopped \
     nginx:latest
 
-if [ $? -ne 0 ]; then
-    echo "❌ docker run 启动失败，请检查目录权限或配置"
+RUN_RESULT=$?
+
+if [ $RUN_RESULT -ne 0 ]; then
+    echo "❌ docker run 启动失败，请执行："
+    echo "docker logs $SERVER_NAME"
     exit 1
 fi
 
+echo "=== 保存脚本为 /opt/start_file_server.sh ==="
+if [ "$(readlink -f $0)" != "/opt/start_file_server.sh" ]; then
+    cp "$0" /opt/start_file_server.sh
+fi
+chmod +x /opt/start_file_server.sh
+
+echo "=== 创建快捷命令 $SHORT_CMD ==="
+ln -sf /opt/start_file_server.sh /usr/local/bin/$SHORT_CMD
+
 echo
 echo "=========================================="
-echo "✅ $TITLE 文件站启动成功！"
-echo "访问地址：  http://$(hostname -I | awk '{print $1}'):$PORT/"
-echo "公网访问：  http://allin1.cn:$PORT/"
+echo "✅ 文件下载站启动成功！"
 echo
-echo "下载示例："
-echo "wget http://allin1.cn:$PORT/文件名"
+echo "内网访问： http://$(hostname -I | awk '{print $1}'):$PORT/"
+echo "公网访问： http://nas.allin1.cn:$PORT/"
+echo
+echo "下载命令示例："
+echo "wget http://nas.allin1.cn:$PORT/文件名"
 echo
 echo "容器名：$SERVER_NAME"
 echo "端口：$PORT"
 echo "目录：$WORK_DIR"
 echo "自启策略：unless-stopped"
+echo
+echo "已经创建快捷命令：$SHORT_CMD"
+echo "以后可直接运行： $SHORT_CMD"
 echo "=========================================="
