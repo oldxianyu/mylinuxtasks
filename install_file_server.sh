@@ -1,11 +1,11 @@
 #!/bin/bash
 # ==========================================
-# Xianyu 文件下载站启动脚本
+# Xianyu 文件下载站启动脚本（保持默认 Index of 标题）
 # ==========================================
 
 PORT=9002
 SERVER_NAME="file-server"
-WORK_DIR="/vol1/1000/work"
+WORK_DIR="/vol2/1000/work"
 TITLE="Xianyu"
 SHORT_CMD="wenjian"
 
@@ -33,8 +33,6 @@ server {
 
     location / {
         root /usr/share/nginx/html;
-        sub_filter 'Index of /' '$TITLE';
-        sub_filter_once off;
     }
 
     gzip off;
@@ -76,7 +74,7 @@ ln -sf /opt/start_file_server.sh /usr/local/bin/$SHORT_CMD
 
 # 输出信息
 echo "=========================================="
-echo "✅ $TITLE 已启动成功！"
+echo "✅ $TITLE 文件服务器已启动成功！"
 echo "访问地址：http://$(hostname -I | awk '{print $1}'):$PORT/"
 echo "公网访问：http://allin1.cn:$PORT/"
 echo
