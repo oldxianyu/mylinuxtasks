@@ -1,25 +1,4 @@
 #!/bin/bash
-# --------------------------------------------
-# 自动把脚本安装为 wgset 命令（只执行一次）
-# --------------------------------------------
-install_wgset_cmd() {
-    local TARGET="/usr/local/bin/wgset"
-
-    # 如果 wgset 命令已经存在就不重复安装
-    if [ -f "$TARGET" ]; then
-        return
-    fi
-
-    echo "正在安装 wgset 命令..."
-
-    # 将当前脚本复制到 /usr/local/bin 并赋予执行权限
-    cp "$0" "$TARGET"
-    chmod +x "$TARGET"
-
-    echo "命令已安装完成！以后你可以直接运行： wgset"
-}
-
-install_wgset_cmd
 
 echo "
 WireGuard 安装脚本
