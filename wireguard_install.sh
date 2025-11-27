@@ -1,23 +1,21 @@
-#!/usr/bin/env bash
-#
-# wgset — WireGuard 管理脚本（自动安装 + 管理菜单）
-# 用法：
-#   sudo wgset       # 第一次安装 WireGuard + 创建第一个客户端 + 进入菜单
-#   sudo wgset       # 以后直接进入管理菜单
-#
-
-# ------------------------------------------------
+#!/bin/bash
+# --------------------------------------------
 # 自动把脚本安装为 wgset 命令（只执行一次）
-# ------------------------------------------------
+# --------------------------------------------
 install_wgset_cmd() {
     local TARGET="/usr/local/bin/wgset"
+
     # 如果 wgset 命令已经存在就不重复安装
     if [ -f "$TARGET" ]; then
         return
     fi
+
     echo "正在安装 wgset 命令..."
+
+    # 将当前脚本复制到 /usr/local/bin 并赋予执行权限
     cp "$0" "$TARGET"
     chmod +x "$TARGET"
+
     echo "命令已安装完成！以后你可以直接运行： wgset"
 }
 
@@ -27,8 +25,6 @@ echo "
 WireGuard 安装脚本
 ==========================
 "
-
-# 如果你希望第一次安装时自动备份 systemd-resolved.conf、配置 DNS，可以保留下面部分
 >/etc/systemd/resolved.conf
 if [[ ! -f ./wg.txt ]]; then
   echo "1" >./wg.txt
@@ -79,38 +75,46 @@ exiterr4() { exiterr "'zypper install' 命令执行失败。"; }
 
 # 检查IP地址格式（IPv4）
 check_ip() {
+  # IPv4地址正则表达式
   IP_REGEX='^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$'
+  # 移除输入中的换行符并检查是否匹配IPv4正则
   printf '%s' "$1" | tr -d '\n' | grep -Eq "$IP_REGEX"
 }
 
 # 检查私有IP地址格式（IPv4）
 check_pvt_ip() {
+  # 私有IPv4地址段正则表达式（10.0.0.0/8、172.16.0.0/12、192.168.0.0/16、169.254.0.0/16）
   IPP_REGEX='^(10|127|172\.(1[6-9]|2[0-9]|3[0-1])|192\.168|169\.254)\.'
+  # 移除输入中的换行符并检查是否匹配私有IP正则
   printf '%s' "$1" | tr -d '\n' | grep -Eq "$IPP_REGEX"
 }
 
 # 检查DNS域名格式（完全限定域名FQDN）
 check_dns_name() {
+  # FQDN正则表达式（支持多级域名，后缀至少2个字符）
   FQDN_REGEX='^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+  # 移除输入中的换行符并检查是否匹配FQDN正则
   printf '%s' "$1" | tr -d '\n' | grep -Eq "$FQDN_REGEX"
 }
 
 # 检查是否以root用户身份运行
 check_root() {
   if [ "$(id -u)" != 0 ]; then
-    exiterr "此安装脚本必须以root用户身份运行。请尝试执行 'sudo wgset'"
+    exiterr "此安装脚本必须以root用户身份运行。请尝试执行 'sudo bash $0'"
   fi
 }
 
 # 检查是否使用bash执行脚本（避免Debian用户用sh执行）
 check_shell() {
+  # 检测是否通过dash（sh在部分Debian系统中的链接）执行脚本
   if readlink /proc/$$/exe | grep -q "dash"; then
     exiterr "此安装脚本需使用 'bash' 执行，不可使用 'sh'。"
   fi
 }
 
-# 检查内核版本（排除 OpenVZ 6 的旧内核）
+# 检查内核版本（排除OpenVZ 6的旧内核）
 check_kernel() {
+  # 若内核主版本为2（OpenVZ 6常见内核版本），则判定为不兼容
   if [[ $(uname -r | cut -d "." -f 1) -eq 2 ]]; then
     exiterr "当前系统运行的内核版本过旧，与本安装脚本不兼容。"
   fi
@@ -120,100 +124,319 @@ check_kernel() {
 check_os() {
   if grep -qs "ubuntu" /etc/os-release; then
     os="ubuntu"
+    # 提取Ubuntu版本号（如20.04提取为2004）
     os_version=$(grep 'VERSION_ID' /etc/os-release | cut -d '"' -f 2 | tr -d '.')
   elif [[ -e /etc/debian_version ]]; then
     os="debian"
+    # 提取Debian主版本号（如11提取为11）
     os_version=$(grep -oE '[0-9]+' /etc/debian_version | head -1)
   elif [[ -e /etc/almalinux-release || -e /etc/rocky-release || -e /etc/centos-release ]]; then
     os="centos"
+    # 提取AlmaLinux/Rocky Linux/CentOS的主版本号
     os_version=$(grep -shoE '[0-9]+' /etc/almalinux-release /etc/rocky-release /etc/centos-release | head -1)
   elif [[ -e /etc/fedora-release ]]; then
     os="fedora"
+    # 提取Fedora版本号
     os_version=$(grep -oE '[0-9]+' /etc/fedora-release | head -1)
   elif [[ -e /etc/SUSE-brand && "$(head -1 /etc/SUSE-brand)" == "openSUSE" ]]; then
     os="openSUSE"
-    os_version=$(tail -1 /etc/SUSE-brand | grep -oE '[0-9\.]+')
+    # 提取openSUSE版本号（如15.4）
+    os_version=$(tail -1 /etc/SUSE-brand | grep -oE '[0-9\\.]+')
   else
-    exiterr "此安装脚本似乎运行在不支持的操作系统上。支持 Ubuntu, Debian, CentOS/AlmaLinux/Rocky, Fedora, openSUSE。"
+    exiterr "此安装脚本似乎运行在不支持的操作系统上。
+支持的操作系统包括：Ubuntu、Debian、AlmaLinux、Rocky Linux、CentOS、Fedora 和 openSUSE。"
   fi
 }
 
+# 检查操作系统版本是否符合要求
 check_os_ver() {
+  # Ubuntu需20.04或更高版本
   if [[ "$os" == "ubuntu" && "$os_version" -lt 2004 ]]; then
-    exiterr "本安装脚本要求 Ubuntu 20.04 或更高版本。"
+    exiterr "本安装脚本要求Ubuntu 20.04或更高版本。
+当前Ubuntu版本过旧，不受支持。"
   fi
+  # Debian需11或更高版本
   if [[ "$os" == "debian" && "$os_version" -lt 11 ]]; then
-    exiterr "本安装脚本要求 Debian 11 或更高版本。"
+    exiterr "本安装脚本要求Debian 11或更高版本。
+当前Debian版本过旧，不受支持。"
   fi
+  # CentOS/AlmaLinux/Rocky Linux需8或更高版本
   if [[ "$os" == "centos" && "$os_version" -lt 8 ]]; then
-    exiterr "本安装脚本要求 CentOS/AlmaLinux/Rocky 8 或更高版本。"
+    exiterr "本安装脚本要求CentOS 8或更高版本。
+当前CentOS版本过旧，不受支持。"
   fi
 }
 
+# 检查是否在容器环境中运行（不支持容器）
 check_container() {
+  # 若系统在容器中运行（如Docker、LXC等），则报错退出
   if systemd-detect-virt -cq 2>/dev/null; then
     exiterr "当前系统运行在容器环境中，本安装脚本不支持容器。"
   fi
 }
 
+# 处理客户端名称（过滤特殊字符，限制长度为15字符）
 set_client_name() {
-  client=$(sed 's/[^0-9a-zA-Z_-]/_/g' <<<"$unsanitized_client" | cut -c-15)
+  # 仅保留字母、数字、短横线（-）和下划线（_），其他字符替换为下划线
+  # 截取前15个字符以兼容Linux客户端
+  client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<<"$unsanitized_client" | cut -c-15)
 }
 
+# 解析命令行参数
 parse_args() {
-  # 保留原来的参数处理逻辑
   while [ "$#" -gt 0 ]; do
     case $1 in
-      --auto) auto=1; shift ;;
-      --addclient) add_client=1; unsanitized_client="$2"; shift 2 ;;
-      --listclients) list_clients=1; shift ;;
-      --removeclient) remove_client=1; unsanitized_client="$2"; shift 2 ;;
-      --showclientqr) show_client_qr=1; unsanitized_client="$2"; shift 2 ;;
-      --uninstall) remove_wg=1; shift ;;
-      --serveraddr) server_addr="$2"; shift 2 ;;
-      --port) server_port="$2"; shift 2 ;;
-      --clientname) first_client_name="$2"; shift 2 ;;
-      --dns1) dns1="$2"; shift 2 ;;
-      --dns2) dns2="$2"; shift 2 ;;
-      -y|--yes) assume_yes=1; shift ;;
-      -h|--help) show_usage; ;
-      *) show_usage "未知参数：$1"; ;
+    --auto)
+      # 自动安装模式（使用默认或自定义选项）
+      auto=1
+      shift
+      ;;
+    --addclient)
+      # 添加新客户端
+      add_client=1
+      unsanitized_client="$2"
+      shift
+      shift
+      ;;
+    --listclients)
+      # 列出所有已存在的客户端
+      list_clients=1
+      shift
+      ;;
+    --removeclient)
+      # 删除指定客户端
+      remove_client=1
+      unsanitized_client="$2"
+      shift
+      shift
+      ;;
+    --showclientqr)
+      # 显示指定客户端的QR码（用于手机客户端扫码配置）
+      show_client_qr=1
+      unsanitized_client="$2"
+      shift
+      shift
+      ;;
+    --uninstall)
+      # 卸载WireGuard并删除所有配置
+      remove_wg=1
+      shift
+      ;;
+    --serveraddr)
+      # 指定服务器地址（FQDN或IPv4）
+      server_addr="$2"
+      shift
+      shift
+      ;;
+    --port)
+      # 指定WireGuard监听端口
+      server_port="$2"
+      shift
+      shift
+      ;;
+    --clientname)
+      # 指定第一个客户端的名称
+      first_client_name="$2"
+      shift
+      shift
+      ;;
+    --dns1)
+      # 指定客户端的首选DNS服务器
+      dns1="$2"
+      shift
+      shift
+      ;;
+    --dns2)
+      # 指定客户端的备用DNS服务器
+      dns2="$2"
+      shift
+      shift
+      ;;
+    -y | --yes)
+      # 移除客户端或卸载时默认回答"是"
+      assume_yes=1
+      shift
+      ;;
+    -h | --help)
+      # 显示帮助信息
+      show_usage
+      ;;
+    *)
+      # 未知参数，显示帮助信息并退出
+      show_usage "未知参数：$1"
+      ;;
     esac
   done
 }
 
+# 检查命令行参数的合法性
 check_args() {
-  # 保留原脚本的参数合法性检查逻辑（如有需要请复制完整）
-  :
-}
-
-install_wget() {
-  if ! hash wget 2>/dev/null && ! hash curl 2>/dev/null; then
-    export DEBIAN_FRONTEND=noninteractive
-    (apt-get -yqq update && apt-get -yqq install wget >/dev/null) || exiterr2
+  # 若已存在WireGuard配置，不可使用--auto参数
+  if [ "$auto" != 0 ] && [ -e "$WG_CONF" ]; then
+    show_usage "参数无效 '--auto'。此服务器已配置WireGuard，不可重复执行自动安装。"
   fi
-}
-
-install_iproute() {
-  if ! hash ip 2>/dev/null; then
-    if [[ "$os" == "debian" || "$os" == "ubuntu" ]]; then
-      export DEBIAN_FRONTEND=noninteractive
-      (apt-get -yqq update && apt-get -yqq install iproute2 >/dev/null) || exiterr2
-    elif [[ "$os" == "openSUSE" ]]; then
-      zypper install -y iproute2 >/dev/null || exiterr4
+  # 不可同时指定多个客户端操作参数（--addclient/--listclients/--removeclient/--showclientqr）
+  if [ "$((add_client + list_clients + remove_client + show_client_qr))" -gt 1 ]; then
+    show_usage "参数无效。仅可指定以下参数之一：'--addclient'、'--listclients'、'--removeclient' 或 '--showclientqr'。"
+  fi
+  # 卸载参数（--uninstall）不可与其他参数同时使用
+  if [ "$remove_wg" = 1 ]; then
+    if [ "$((add_client + list_clients + remove_client + show_client_qr + auto))" -gt 0 ]; then
+      show_usage "参数无效。'--uninstall' 不可与其他参数同时指定。"
+    fi
+  fi
+  # 若未配置WireGuard，不可执行客户端相关操作
+  if [ ! -e "$WG_CONF" ]; then
+    st_text="需先配置WireGuard，然后才能"
+    [ "$add_client" = 1 ] && exiterr "$st_text 添加客户端。"
+    [ "$list_clients" = 1 ] && exiterr "$st_text 列出客户端。"
+    [ "$remove_client" = 1 ] && exiterr "$st_text 删除客户端。"
+    [ "$show_client_qr" = 1 ] && exiterr "$st_text 显示客户端QR码。"
+    [ "$remove_wg" = 1 ] && exiterr "无法卸载WireGuard，因为此服务器尚未配置WireGuard。"
+  fi
+  # --clientname参数仅可在安装WireGuard时使用
+  if [ "$((add_client + remove_client + show_client_qr))" = 1 ] && [ -n "$first_client_name" ]; then
+    show_usage "参数无效。'--clientname' 仅可在安装WireGuard时指定。"
+  fi
+  # 服务器地址/端口/第一个客户端名称参数，仅可在自动安装模式（--auto）下使用
+  if [ -n "$server_addr" ] || [ -n "$server_port" ] || [ -n "$first_client_name" ]; then
+    if [ -e "$WG_CONF" ]; then
+      show_usage "参数无效。此服务器已配置WireGuard，不可重复指定服务器信息。"
+    elif [ "$auto" = 0 ]; then
+      show_usage "参数无效。使用这些参数时必须指定 '--auto'（自动安装模式）。"
+    fi
+  fi
+  # 检查添加客户端参数的合法性
+  if [ "$add_client" = 1 ]; then
+    set_client_name
+    if [ -z "$client" ]; then
+      exiterr "客户端名称无效。仅可使用单个单词，特殊字符仅支持 '-' 和 '_'。"
+    elif grep -q "^# BEGIN_PEER $client$" "$WG_CONF"; then
+      exiterr "$client：名称无效。该客户端已存在。"
+    fi
+  fi
+  # 检查删除/显示QR码客户端参数的合法性
+  if [ "$remove_client" = 1 ] || [ "$show_client_qr" = 1 ]; then
+    set_client_name
+    if [ -z "$client" ] || ! grep -q "^# BEGIN_PEER $client$" "$WG_CONF"; then
+      exiterr "客户端名称无效，或该客户端不存在。"
+    fi
+  fi
+  # 检查服务器地址格式（必须是FQDN或IPv4）
+  if [ -n "$server_addr" ] && { ! check_dns_name "$server_addr" && ! check_ip "$server_addr"; }; then
+    exiterr "服务器地址无效。必须是完全限定域名（FQDN）或IPv4地址。"
+  fi
+  # 检查第一个客户端名称的合法性
+  if [ -n "$first_client_name" ]; then
+    unsanitized_client="$first_client_name"
+    set_client_name
+    if [ -z "$client" ]; then
+      exiterr "客户端名称无效。仅可使用单个单词，特殊字符仅支持 '-' 和 '_'。"
+    fi
+  fi
+  # 检查服务器端口的合法性（1-65535之间的整数）
+  if [ -n "$server_port" ]; then
+    if [[ ! "$server_port" =~ ^[0-9]+$ || "$server_port" -gt 65535 ]]; then
+      exiterr "端口无效。必须是1-65535之间的整数。"
+    fi
+  fi
+  # 检查DNS服务器参数的合法性
+  if [ -n "$dns1" ]; then
+    if [ -e "$WG_CONF" ] && [ "$add_client" = 0 ]; then
+      show_usage "参数无效。自定义DNS服务器仅可在安装WireGuard或添加客户端时指定。"
+    fi
+  fi
+  # 检查DNS服务器地址格式（必须是IPv4）
+  if { [ -n "$dns1" ] && ! check_ip "$dns1"; } ||
+    { [ -n "$dns2" ] && ! check_ip "$dns2"; }; then
+    exiterr "DNS服务器地址无效。"
+  fi
+  # 不可单独指定备用DNS（--dns2），需先指定首选DNS（--dns1）
+  if [ -z "$dns1" ] && [ -n "$dns2" ]; then
+    show_usage "DNS参数无效。指定 '--dns2' 前必须先指定 '--dns1'。"
+  fi
+  # 整理DNS服务器配置字符串
+  if [ -n "$dns1" ] && [ -n "$dns2" ]; then
+    dns="$dns1, $dns2"
+  elif [ -n "$dns1" ]; then
+    dns="$dns1"
+  else
+    ping -c1 google.com >/dev/null 2>&1
+    if [[ $? -eq 0 ]]; then
+      dns="1.1.1.1"
     else
-      yum -y -q install iproute >/dev/null || exiterr3
+      dns="233.5.5.5"
     fi
   fi
 }
 
+# 检查CentOS系统是否启用nftables（不支持nftables，需使用iptables）
+check_nftables() {
+  if [ "$os" = "centos" ]; then
+    if grep -qs "hwdsl2 VPN脚本" /etc/sysconfig/nftables.conf ||
+      systemctl is-active --quiet nftables 2>/dev/null; then
+      exiterr "当前系统已启用nftables，本安装脚本不支持nftables。"
+    fi
+  fi
+}
+
+# 安装wget（部分Debian最小系统可能未预装wget和curl）
+install_wget() {
+  # 检测是否既无wget也无curl
+  if ! hash wget 2>/dev/null && ! hash curl 2>/dev/null; then
+    if [ "$auto" = 0 ]; then
+      echo "本安装脚本需要wget工具。"
+      read -n1 -r -p "按任意键安装wget并继续..."
+    fi
+    # 非交互模式安装wget
+    export DEBIAN_FRONTEND=noninteractive
+    (
+      set -x
+      apt-get -yqq update || apt-get -yqq update
+      apt-get -yqq install wget >/dev/null
+    ) || exiterr2
+  fi
+}
+
+# 安装iproute2（提供ip命令，用于网络配置）
+install_iproute() {
+  if ! hash ip 2>/dev/null; then
+    if [ "$auto" = 0 ]; then
+      echo "本安装脚本需要iproute工具。"
+      read -n1 -r -p "按任意键安装iproute并继续..."
+    fi
+    # 根据操作系统选择对应的包管理器安装iproute2
+    if [ "$os" = "debian" ] || [ "$os" = "ubuntu" ]; then
+      export DEBIAN_FRONTEND=noninteractive
+      (
+        set -x
+        apt-get -yqq update || apt-get -yqq update
+        apt-get -yqq install iproute2 >/dev/null
+      ) || exiterr2
+    elif [ "$os" = "openSUSE" ]; then
+      (
+        set -x
+        zypper install iproute2 >/dev/null
+      ) || exiterr4
+    else
+      (
+        set -x
+        yum -y -q install iproute >/dev/null
+      ) || exiterr3
+    fi
+  fi
+}
+
+# 显示脚本头部信息（项目名称和地址）
 show_header() {
   cat <<'EOF'
+
 WireGuard 安装脚本
-https://github.com/oldxianyu/mylinuxtasks
+https://github.com/oldxianyu/mylinuxtasks/edit/main/wireguard_install
 EOF
 }
 
+# 显示欢迎头部信息（交互式安装时）
 show_header2() {
   cat <<'EOF'
 
@@ -222,13 +445,16 @@ show_header2() {
 EOF
 }
 
+# 显示版权信息
 show_header3() {
   cat <<'EOF'
 
-版权所有 (c) 2025-2025
+版权所有 (c) 2022-2025 林松
+版权所有 (c) 2020-2023 Nyr
 EOF
 }
 
+# 显示帮助信息（命令行参数说明）
 show_usage() {
   if [ -n "$1" ]; then
     echo "错误：$1" >&2
@@ -238,7 +464,29 @@ show_usage() {
   cat 1>&2 <<EOF
 
 用法：bash $0 [选项]
-...
+
+选项：
+
+  --addclient [客户端名称]      添加新的WireGuard客户端
+  --dns1 [DNS服务器IP]         新客户端的首选DNS服务器（可选，默认：公共DNS）
+  --dns2 [DNS服务器IP]         新客户端的备用DNS服务器（可选）
+  --listclients                  列出所有已存在的客户端名称
+  --removeclient [客户端名称]   删除指定的客户端
+  --showclientqr [客户端名称]   显示指定客户端的QR码（用于手机扫码配置）
+  --uninstall                    卸载WireGuard并删除所有配置文件
+  -y, --yes                      移除客户端或卸载时，默认回答"是"（跳过确认）
+  -h, --help                     显示此帮助信息并退出
+
+安装选项（可选）：
+
+  --auto                         自动安装WireGuard（使用默认或自定义选项）
+  --serveraddr [DNS名称或IP]    服务器地址（必须是完全限定域名FQDN或IPv4地址）
+  --port [端口号]                WireGuard监听端口（1-65535，默认：51820）
+  --clientname [客户端名称]      第一个WireGuard客户端的名称（默认：client）
+  --dns1 [DNS服务器IP]         第一个客户端的首选DNS服务器（默认：公共DNS）
+  --dns2 [DNS服务器IP]         第一个客户端的备用DNS服务器
+
+如需自定义更多选项，也可直接运行此脚本（不附带任何参数）。
 EOF
   exit 1
 }
@@ -1014,80 +1262,488 @@ finish_setup() {
   echo "如需添加新客户端，重新运行此脚本即可。"
 }
 
-wg_manage_menu() {
-  while true; do
-    echo
-    echo "请选择操作："
-    echo "   1) 添加新客户端"
-    echo "   2) 列出所有已存在的客户端"
-    echo "   3) 删除指定客户端"
-    echo "   4) 显示指定客户端的 QR 码"
-    echo "   5) 卸载 WireGuard"
-    echo "   6) 退出"
+# 显示已安装WireGuard后的操作菜单（交互式模式）
+# 显示已安装WireGuard后的操作菜单（交互式模式）
+select_menu_option() {
+  echo
+  echo "WireGuard已安装完成。"
+  echo
+  echo "请选择操作："
+  echo "   1) 添加新客户端"
+  echo "   2) 列出所有已存在的客户端"
+  echo "   3) 删除指定客户端"
+  echo "   4) 显示指定客户端的QR码"
+  echo "   5) 卸载WireGuard"
+  echo "   6) 退出"
+  read -rp "选择操作 [1-6]：" option
+  # 验证用户输入的合法性（必须是1-6的整数）
+  until [[ "$option" =~ ^[1-6]$ ]]; do
+    echo "$option：选择无效。"
     read -rp "选择操作 [1-6]：" option
-    case "$option" in
-      1)
-        unsanitized_client=""
-        read -rp "请输入新客户端名称：" unsanitized_client
-        set_client_name
-        add_client=1
-        parse_args --addclient "$unsanitized_client"
-        # 假设你的脚本有 add_client 分支逻辑，可以调用 main install/addclient 函数
-        # 例如 new_client + update 防火墙 + 生成配置 + 显示 QR
-        # 这里直接调用原脚本相应逻辑
-        # 你需要确保原脚本中 add 客户端的逻辑可以被复用
-        exec /usr/local/bin/wgset --addclient "$client"
-        ;;
-      2)
-        list_clients=1
-        exec /usr/local/bin/wgset --listclients
-        ;;
-      3)
-        unsanitized_client=""
-        read -rp "请输入要删除的客户端名称：" unsanitized_client
-        set_client_name
-        remove_client=1
-        parse_args --removeclient "$client"
-        exec /usr/local/bin/wgset --removeclient "$client"
-        ;;
-      4)
-        unsanitized_client=""
-        read -rp "请输入要显示 QR 的客户端名称：" unsanitized_client
-        set_client_name
-        show_client_qr=1
-        parse_args --showclientqr "$client"
-        exec /usr/local/bin/wgset --showclientqr "$client"
-        ;;
-      5)
-        remove_wg=1
-        parse_args --uninstall
-        exec /usr/local/bin/wgset --uninstall
-        ;;
-      6)
-        exit 0
-        ;;
-      *)
-        echo "无效选择。请输入 1–6 之间数字。"
-        ;;
-    esac
   done
 }
 
-# -------------------------------
-# 主入口
-# -------------------------------
-main() {
-  check_root
-  WG_CONF="/etc/wireguard/wg0.conf"
-
-  if [ ! -f "$WG_CONF" ]; then
-    # 第一次运行：安装 WireGuard + 创建第一个客户端 + 启动服务
-    wgsetup "$@"
-  fi
-
-  # 已安装后 / 以后运行：进入管理菜单
-  wg_manage_menu
+# 列出所有已存在的客户端（从服务器配置中提取）
+show_clients() {
+  grep '^# BEGIN_PEER' "$WG_CONF" | cut -d ' ' -f 3 | nl -s ') '
 }
 
-# 执行主入口
-main "$@"
+# 让用户输入新客户端的名称（交互式添加客户端时）
+enter_client_name() {
+  echo
+  echo "请为新客户端输入名称："
+  read -rp "名称：" unsanitized_client
+  # 若用户未输入名称，中止操作
+  [ -z "$unsanitized_client" ] && abort_and_exit
+  # 处理客户端名称（过滤特殊字符、限制长度）
+  set_client_name
+  # 验证名称合法性（非空且未重复）
+  while [[ -z "$client" ]] || grep -q "^# BEGIN_PEER $client$" "$WG_CONF"; do
+    if [ -z "$client" ]; then
+      echo "客户端名称无效。仅可使用单个单词，特殊字符仅支持 '-' 和 '_'。"
+    else
+      echo "$client：名称已存在，请重新输入。"
+    fi
+    read -rp "名称：" unsanitized_client
+    [ -z "$unsanitized_client" ] && abort_and_exit
+    set_client_name
+  done
+}
+
+# 将新客户端配置更新到运行中的WireGuard接口（无需重启服务）
+update_wg_conf() {
+  # 提取新客户端的Peer配置并添加到wg0接口
+  wg addconf wg0 <(sed -n "/^# BEGIN_PEER $client/,/^# END_PEER $client/p" "$WG_CONF")
+}
+
+# 显示客户端添加成功的提示信息
+print_client_added() {
+  echo
+  echo "$client 添加成功。配置文件已保存至：$export_dir$client.conf"
+}
+
+# 显示“正在检查客户端”的提示信息
+print_check_clients() {
+  echo
+  echo "正在检查已存在的客户端..."
+}
+
+# 检查是否存在已配置的客户端（无客户端时报错退出）
+check_clients() {
+  num_of_clients=$(grep -c '^# BEGIN_PEER' "$WG_CONF")
+  if [[ "$num_of_clients" = 0 ]]; then
+    echo
+    echo "当前无已配置的客户端！"
+    exit 1
+  fi
+}
+
+# 显示客户端总数
+print_client_total() {
+  if [ "$num_of_clients" = 1 ]; then
+    printf '\n%s\n' "总计：1个客户端"
+  elif [ -n "$num_of_clients" ]; then
+    printf '\n%s\n' "总计：$num_of_clients个客户端"
+  fi
+}
+
+# 让用户选择要执行操作（删除/显示QR码）的客户端
+select_client_to() {
+  echo
+  echo "请选择要$1的客户端："
+  show_clients
+  read -rp "客户端编号：" client_num
+  # 若用户未输入编号，中止操作
+  [ -z "$client_num" ] && abort_and_exit
+  # 验证编号合法性（必须是1到客户端总数之间的整数）
+  until [[ "$client_num" =~ ^[0-9]+$ && "$client_num" -le "$num_of_clients" ]]; do
+    echo "$client_num：选择无效。"
+    read -rp "客户端编号：" client_num
+    [ -z "$client_num" ] && abort_and_exit
+  done
+  # 根据编号提取对应的客户端名称
+  client=$(grep '^# BEGIN_PEER' "$WG_CONF" | cut -d ' ' -f 3 | sed -n "$client_num"p)
+}
+
+# 确认是否删除指定客户端（交互式模式，--yes参数可跳过）
+confirm_remove_client() {
+  if [ "$assume_yes" != 1 ]; then
+    echo
+    read -rp "确认删除 $client 吗？[y/N]：" remove
+    # 验证用户输入（仅接受y/Y/n/N）
+    until [[ "$remove" =~ ^[yYnN]*$ ]]; do
+      echo "$remove：选择无效。"
+      read -rp "确认删除 $client 吗？[y/N]：" remove
+    done
+  else
+    # --yes参数已指定，默认确认删除
+    remove=y
+  fi
+}
+
+# 删除客户端的配置文件（若存在）
+remove_client_conf() {
+  get_export_dir
+  wg_file="$export_dir$client.conf"
+  if [ -f "$wg_file" ]; then
+    echo "正在删除客户端配置文件：$wg_file..."
+    rm -f "$wg_file"
+  fi
+}
+
+# 显示“正在删除客户端”的提示信息
+print_remove_client() {
+  echo
+  echo "正在删除客户端 $client..."
+}
+
+# 从WireGuard中删除指定客户端（实时生效+删除配置）
+remove_client_wg() {
+  # 正确的删除方式（不影响其他客户端连接）：
+  # 1. 从运行中的wg0接口移除客户端
+  wg set wg0 peer "$(sed -n "/^# BEGIN_PEER $client$/,\$p" "$WG_CONF" | grep -m 1 PublicKey | cut -d " " -f 3)" remove
+  # 2. 从服务器配置文件中删除客户端的Peer配置
+  sed -i "/^# BEGIN_PEER $client$/,/^# END_PEER $client$/d" "$WG_CONF"
+  # 3. 删除客户端的本地配置文件
+  remove_client_conf
+}
+
+# 显示客户端删除成功的提示信息
+print_client_removed() {
+  echo
+  echo "$client 删除成功！"
+}
+
+# 显示客户端删除中止的提示信息
+print_client_removal_aborted() {
+  echo
+  echo "$client 删除操作已中止！"
+}
+
+# 检查客户端配置文件是否存在（显示QR码前必需）
+check_client_conf() {
+  wg_file="$export_dir$client.conf"
+  if [ ! -f "$wg_file" ]; then
+    echo "错误：无法显示QR码，客户端配置文件 $wg_file 不存在。" >&2
+    echo "       您可以重新运行此脚本并添加新客户端。" >&2
+    exit 1
+  fi
+}
+
+# 显示客户端配置文件的路径
+print_client_conf() {
+  echo
+  echo "'$client' 的配置文件路径：$wg_file"
+}
+
+# 确认是否卸载WireGuard（交互式模式，--yes参数可跳过）
+confirm_remove_wg() {
+  if [ "$assume_yes" != 1 ]; then
+    echo
+    read -rp "确认卸载WireGuard吗？[y/N]：" remove
+    # 验证用户输入（仅接受y/Y/n/N）
+    until [[ "$remove" =~ ^[yYnN]*$ ]]; do
+      echo "$remove：选择无效。"
+      read -rp "确认卸载WireGuard吗？[y/N]：" remove
+    done
+  else
+    # --yes参数已指定，默认确认卸载
+    remove=y
+  fi
+}
+
+# 显示“正在卸载WireGuard”的提示信息
+print_remove_wg() {
+  echo
+  echo "正在卸载WireGuard，请稍候..."
+}
+
+# 禁用并停止WireGuard服务
+disable_wg_service() {
+  systemctl disable --now wg-quick@wg0.service
+}
+
+# 移除WireGuard相关的sysctl配置（恢复默认内核参数）
+remove_sysctl_rules() {
+  rm -f /etc/sysctl.d/99-wireguard-forward.conf /etc/sysctl.d/99-wireguard-optimize.conf
+  # 若系统未安装其他VPN（OpenVPN/IPsec），关闭IP转发
+  if [ ! -f /usr/sbin/openvpn ] && [ ! -f /usr/sbin/ipsec ] &&
+    [ ! -f /usr/local/sbin/ipsec ]; then
+    echo 0 >/proc/sys/net/ipv4/ip_forward
+    echo 0 >/proc/sys/net/ipv6/conf/all/forwarding
+  fi
+}
+
+# 从rc.local中移除WireGuard相关的规则
+remove_rclocal_rules() {
+  ipt_cmd="systemctl restart wg-iptables.service"
+  if grep -qs "$ipt_cmd" /etc/rc.local; then
+    sed --follow-symlinks -i "/^$ipt_cmd/d" /etc/rc.local
+  fi
+}
+
+# 显示WireGuard卸载成功的提示信息
+print_wg_removed() {
+  echo
+  echo "WireGuard卸载成功！"
+}
+
+# 显示WireGuard卸载中止的提示信息
+print_wg_removal_aborted() {
+  echo
+  echo "WireGuard卸载操作已中止！"
+}
+
+# WireGuard核心配置函数（整合所有步骤）
+wgsetup() {
+
+  # 设置环境变量PATH（确保命令可正常找到）
+  export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+  # 前置检查：root权限、shell类型、内核版本、操作系统、操作系统版本、是否为容器
+  check_root
+  check_shell
+  check_kernel
+  check_os
+  check_os_ver
+  check_container
+
+  # WireGuard服务器配置文件路径
+  WG_CONF="/etc/wireguard/wg0.conf"
+
+  # 初始化变量（默认值）
+  auto=0                # 是否自动安装模式
+  assume_yes=0          # 是否默认确认（--yes参数）
+  add_client=0          # 是否执行添加客户端操作
+  list_clients=0        # 是否执行列出客户端操作
+  remove_client=0       # 是否执行删除客户端操作
+  show_client_qr=0      # 是否执行显示客户端QR码操作
+  remove_wg=0           # 是否执行卸载WireGuard操作
+  public_ip=""          # 服务器公网IP（仅NAT环境需要）
+  server_addr=""        # 自动安装时指定的服务器地址（FQDN/IP）
+  server_port=""        # 自动安装时指定的监听端口
+  first_client_name=""  # 自动安装时指定的第一个客户端名称
+  unsanitized_client="" # 未处理的客户端名称（用户输入）
+  client=""             # 处理后的客户端名称（过滤特殊字符）
+  dns=""                # 客户端DNS服务器配置字符串
+  dns1=""               # 客户端首选DNS服务器（--dns1参数）
+  dns2=""               # 客户端备用DNS服务器（--dns2参数）
+
+  # 解析命令行参数
+  parse_args "$@"
+  # 检查参数合法性
+  check_args
+
+  # 分支1：执行添加客户端操作
+  if [ "$add_client" = 1 ]; then
+    show_header
+    new_client add_client
+    update_wg_conf
+    echo
+    show_client_qr_code
+    print_client_added
+    exit 0
+  fi
+
+  # 分支2：执行列出客户端操作
+  if [ "$list_clients" = 1 ]; then
+    show_header
+    print_check_clients
+    check_clients
+    echo
+    show_clients
+    print_client_total
+    exit 0
+  fi
+
+  # 分支3：执行删除客户端操作
+  if [ "$remove_client" = 1 ]; then
+    show_header
+    confirm_remove_client
+    if [[ "$remove" =~ ^[yY]$ ]]; then
+      print_remove_client
+      remove_client_wg
+      print_client_removed
+      exit 0
+    else
+      print_client_removal_aborted
+      exit 1
+    fi
+  fi
+
+  # 分支4：执行显示客户端QR码操作
+  if [ "$show_client_qr" = 1 ]; then
+    show_header
+    echo
+    get_export_dir
+    check_client_conf
+    show_client_qr_code
+    print_client_conf
+    exit 0
+  fi
+
+  # 分支5：执行卸载WireGuard操作
+  if [ "$remove_wg" = 1 ]; then
+    show_header
+    confirm_remove_wg
+    if [[ "$remove" =~ ^[yY]$ ]]; then
+      print_remove_wg
+      remove_firewall_rules
+      disable_wg_service
+      remove_sysctl_rules
+      remove_rclocal_rules
+      remove_pkgs
+      print_wg_removed
+      exit 0
+    else
+      print_wg_removal_aborted
+      exit 1
+    fi
+  fi
+
+  # 分支6：首次安装WireGuard（未存在配置文件）
+  if [[ ! -e "$WG_CONF" ]]; then
+    # 额外检查：CentOS系统是否启用nftables（不支持）
+    check_nftables
+    # 安装必需工具：wget、iproute2
+    install_wget
+    install_iproute
+    # 显示欢迎信息
+    show_welcome
+    # 处理服务器地址（自动模式vs交互式模式）
+    if [ "$auto" = 0 ]; then
+      enter_server_address
+    else
+      if [ -n "$server_addr" ]; then
+        ip="$server_addr"
+      else
+        detect_ip
+        check_nat_ip
+      fi
+    fi
+    # 显示配置信息（仅自动模式）
+    show_config
+    # 检测IPv6支持
+    detect_ipv6
+    # 选择监听端口
+    select_port
+    # 输入第一个客户端名称
+    enter_first_client_name
+    # 选择DNS服务器（仅交互式模式）
+    if [ "$auto" = 0 ]; then
+      select_dns
+    fi
+    # 提示配置就绪
+    show_setup_ready
+    # 检查防火墙（无防火墙则自动安装）
+    check_firewall
+    # 确认是否继续安装
+    confirm_setup
+    # 提示开始安装
+    show_start_setup
+    # 安装WireGuard及依赖包
+    install_pkgs
+    # 创建服务器配置文件
+    create_server_config
+    # 更新sysctl内核参数（启用转发、优化网络）
+    update_sysctl
+    # 创建防火墙规则
+    create_firewall_rules
+    # 非openSUSE系统：更新rc.local（确保重启后加载iptables规则）
+    if [ "$os" != "openSUSE" ]; then
+      update_rclocal
+    fi
+    # 创建第一个客户端配置
+    new_client
+    # 启用并启动WireGuard服务
+    start_wg_service
+    echo
+    # 显示第一个客户端的QR码
+    show_client_qr_code
+    # 若自动模式且使用DNS名称，显示解析提醒
+    if [ "$auto" != 0 ] && check_dns_name "$server_addr"; then
+      show_dns_name_note "$server_addr"
+    fi
+    # 显示安装完成信息
+    finish_setup
+  # 分支7：已安装WireGuard（存在配置文件），显示操作菜单
+  else
+    show_header
+    # 显示操作菜单并获取用户选择
+    select_menu_option
+    case "$option" in
+    1)
+      # 选项1：添加新客户端
+      enter_client_name
+      select_dns
+      new_client add_client
+      update_wg_conf
+      echo
+      show_client_qr_code
+      print_client_added
+      exit 0
+      ;;
+    2)
+      # 选项2：列出所有客户端
+      print_check_clients
+      check_clients
+      echo
+      show_clients
+      print_client_total
+      exit 0
+      ;;
+    3)
+      # 选项3：删除指定客户端
+      check_clients
+      select_client_to "删除"
+      confirm_remove_client
+      if [[ "$remove" =~ ^[yY]$ ]]; then
+        print_remove_client
+        remove_client_wg
+        print_client_removed
+        exit 0
+      else
+        print_client_removal_aborted
+        exit 1
+      fi
+      ;;
+    4)
+      # 选项4：显示指定客户端的QR码
+      check_clients
+      select_client_to "显示QR码"
+      echo
+      get_export_dir
+      check_client_conf
+      show_client_qr_code
+      print_client_conf
+      exit 0
+      ;;
+    5)
+      # 选项5：卸载WireGuard
+      confirm_remove_wg
+      if [[ "$remove" =~ ^[yY]$ ]]; then
+        print_remove_wg
+        remove_firewall_rules
+        disable_wg_service
+        remove_sysctl_rules
+        remove_rclocal_rules
+        remove_pkgs
+        print_wg_removed
+        exit 0
+      else
+        print_wg_removal_aborted
+        exit 1
+      fi
+      ;;
+    6)
+      # 选项6：退出脚本
+      exit 0
+      ;;
+    esac
+  fi
+}
+
+## 延迟执行核心配置函数（确保脚本完全加载后再运行）
+wgsetup "$@"
+
+exit 0
