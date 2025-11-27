@@ -1,4 +1,25 @@
 #!/bin/bash
+# ---------------------------------------
+# 自动安装当前脚本为全局命令 wgset
+# ---------------------------------------
+INSTALL_PATH="/usr/local/bin/wgset"
+
+# 如果不是以 wgset 方式运行（说明是第一次运行脚本）
+if [ "$0" != "$INSTALL_PATH" ]; then
+    echo "检测到首次使用，正在将脚本安装为系统命令 wgset..."
+
+    # 将当前脚本复制为 /usr/local/bin/wgset
+    cp "$0" "$INSTALL_PATH" 2>/dev/null || {
+        echo "复制失败，尝试使用 curl 下载最新版本..."
+        curl -sSL https://raw.githubusercontent.com/oldxianyu/mylinuxtasks/main/wireguard_install.sh -o "$INSTALL_PATH"
+    }
+
+    chmod +x "$INSTALL_PATH"
+
+    echo "安装完成！以后可直接运行命令： wgset"
+    echo "-----------------------------------------"
+    echo
+fi
 
 echo "
 WireGuard 安装脚本
