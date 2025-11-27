@@ -411,7 +411,7 @@ show_header() {
   cat <<'EOF'
 
 WireGuard 安装脚本
-https://github.com/hwdsl2/wireguard-install
+https://github.com/oldxianyu/mylinuxtasks/edit/main/wireguard_install
 EOF
 }
 
@@ -420,7 +420,6 @@ show_header2() {
   cat <<'EOF'
 
 欢迎使用 WireGuard 服务器安装脚本！
-GitHub 项目地址：https://github.com/hwdsl2/wireguard-install
 
 EOF
 }
