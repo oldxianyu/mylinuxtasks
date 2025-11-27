@@ -176,7 +176,7 @@ parse_args() {
       unsanitized_client="$2"
       shift
       shift
-      ;;
+      ;
     --listclients)
       # 列出所有已存在的客户端
       list_clients=1
