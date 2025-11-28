@@ -25,7 +25,7 @@ find_public_ip() {
     echo "$get_public_ip"
 }
 
-# 防火墙规则（保持原样）
+# 防火墙规则，不要改，IPV6那个也保留，即使用不到，测试不留着的话会丢包
 create_firewall_rules() {
     if systemctl is-active --quiet firewalld.service; then
         firewall-cmd -q --add-port="$PORT"/udp
@@ -83,7 +83,6 @@ else
     SERVER_PUBLIC_KEY=$(echo "$SERVER_PRIVATE_KEY" | wg pubkey)
 fi
 
-# 确定客户端名字和IP
 CLIENT_NAME="Client0"
 i=0
 while [[ -f "$WG_CONF_DIR/${CLIENT_NAME}.conf" ]]; do
@@ -97,10 +96,8 @@ CLIENT_IP="10.7.0.$((i+2))/32"
 CLIENT_PRIVATE_KEY=$(wg genkey)
 CLIENT_PUBLIC_KEY=$(echo "$CLIENT_PRIVATE_KEY" | wg pubkey)
 
-# 保存到服务端配置文件
 echo -e "\n[Peer]\nPublicKey = $CLIENT_PUBLIC_KEY\nAllowedIPs = $CLIENT_IP" >> "$WG_SERVER_CONF"
 
-# 动态添加客户端到正在运行的 wg0
 wg set wg0 peer "$CLIENT_PUBLIC_KEY" allowed-ips "$CLIENT_IP"
 
 # 生成客户端配置文件
