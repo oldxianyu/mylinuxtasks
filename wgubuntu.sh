@@ -25,7 +25,7 @@ find_public_ip() {
     echo "$get_public_ip"
 }
 
-# 创建防火墙规则......不要改动这里，我测试了好多次，只能这样写，不然IP变动会出错
+# 防火墙规则（保持原样）
 create_firewall_rules() {
     if systemctl is-active --quiet firewalld.service; then
         firewall-cmd -q --add-port="$PORT"/udp
@@ -64,17 +64,26 @@ echo "服务器公网IP: $SERVER_IP"
 
 mkdir -p "$WG_CONF_DIR"
 
-# 生成服务端密钥
-SERVER_PRIVATE_KEY=$(wg genkey)
-SERVER_PUBLIC_KEY=$(echo "$SERVER_PRIVATE_KEY" | wg pubkey)
-
-cat > "$WG_SERVER_CONF" <<EOF
+# 如果服务端配置不存在，生成服务端密钥和配置
+if [[ ! -f "$WG_SERVER_CONF" ]]; then
+    SERVER_PRIVATE_KEY=$(wg genkey)
+    SERVER_PUBLIC_KEY=$(echo "$SERVER_PRIVATE_KEY" | wg pubkey)
+    cat > "$WG_SERVER_CONF" <<EOF
 [Interface]
 Address = 10.7.0.1/24
 ListenPort = $PORT
 PrivateKey = $SERVER_PRIVATE_KEY
 EOF
 
+    echo "启动 WireGuard..."
+    systemctl start wg-quick@wg0
+else
+    # 读取服务端公钥
+    SERVER_PRIVATE_KEY=$(grep PrivateKey "$WG_SERVER_CONF" | awk '{print $3}')
+    SERVER_PUBLIC_KEY=$(echo "$SERVER_PRIVATE_KEY" | wg pubkey)
+fi
+
+# 确定客户端名字和IP
 CLIENT_NAME="Client0"
 i=0
 while [[ -f "$WG_CONF_DIR/${CLIENT_NAME}.conf" ]]; do
@@ -82,14 +91,19 @@ while [[ -f "$WG_CONF_DIR/${CLIENT_NAME}.conf" ]]; do
     CLIENT_NAME="Client$i"
 done
 
-CLIENT_IP="10.7.0.$((i+2))/24"
+CLIENT_IP="10.7.0.$((i+2))/32"
 
-# 生成客户端私钥
+# 生成客户端密钥
 CLIENT_PRIVATE_KEY=$(wg genkey)
 CLIENT_PUBLIC_KEY=$(echo "$CLIENT_PRIVATE_KEY" | wg pubkey)
+
+# 保存到服务端配置文件
 echo -e "\n[Peer]\nPublicKey = $CLIENT_PUBLIC_KEY\nAllowedIPs = $CLIENT_IP" >> "$WG_SERVER_CONF"
 
-# 生成客户端配置
+# 动态添加客户端到正在运行的 wg0
+wg set wg0 peer "$CLIENT_PUBLIC_KEY" allowed-ips "$CLIENT_IP"
+
+# 生成客户端配置文件
 CLIENT_CONF="$WG_CONF_DIR/${CLIENT_NAME}.conf"
 cat > "$CLIENT_CONF" <<EOF
 [Interface]
@@ -104,20 +118,9 @@ AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 25
 EOF
 
-if systemctl is-active --quiet wg-quick@wg0.service; then
-    echo "重启 WireGuard 以应用新客户端配置..."
-    systemctl restart wg-quick@wg0
-else
-    echo "启动 WireGuard..."
-    systemctl start wg-quick@wg0
-fi
-
 echo -e "\n======= 复制以下$CLIENT_NAME 配置导入客户端 ======="
 cat "$CLIENT_CONF"
 echo "客户端配置已保存: $CLIENT_CONF"
-
-# 启动 WireGuard
-wg-quick up wg0 >/dev/null 2>&1
 
 # 添加防火墙规则
 create_firewall_rules
