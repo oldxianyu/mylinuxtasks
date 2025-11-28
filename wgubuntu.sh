@@ -68,7 +68,6 @@ mkdir -p "$WG_CONF_DIR"
 SERVER_PRIVATE_KEY=$(wg genkey)
 SERVER_PUBLIC_KEY=$(echo "$SERVER_PRIVATE_KEY" | wg pubkey)
 
-# 创建服务端配置
 cat > "$WG_SERVER_CONF" <<EOF
 [Interface]
 Address = 10.7.0.1/24
@@ -83,14 +82,11 @@ while [[ -f "$WG_CONF_DIR/${CLIENT_NAME}.conf" ]]; do
     CLIENT_NAME="Client$i"
 done
 
-# 客户端 IP：10.7.0.x递增
-CLIENT_IP="10.7.0.$((i+2))/32"
+CLIENT_IP="10.7.0.$((i+2))/24"
 
 # 生成客户端私钥
 CLIENT_PRIVATE_KEY=$(wg genkey)
 CLIENT_PUBLIC_KEY=$(echo "$CLIENT_PRIVATE_KEY" | wg pubkey)
-
-# 将客户端加入服务端配置
 echo -e "\n[Peer]\nPublicKey = $CLIENT_PUBLIC_KEY\nAllowedIPs = $CLIENT_IP" >> "$WG_SERVER_CONF"
 
 # 生成客户端配置
