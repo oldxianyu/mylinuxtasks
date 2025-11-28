@@ -72,3 +72,20 @@ TITLE="xianyu下载站"
 - `wg_ui_manage.sh`：WireGuard 管理脚本  
 - `install_file_server.sh`：Docker 文件下载站生成脚本  
 - 其他脚本：后续扩展的系统自动化工具
+
+### wgubuntu.sh的使用
+```
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/oldxianyu/mylinuxtasks/main/wgubuntu.sh)"  
+```
+- 直接运行即可  
+
+### wireguard_install.sh 的使用  
+直接运行  
+```
+curl -sSL https://raw.githubusercontent.com/oldxianyu/mylinuxtasks/main/wireguard_install.sh -o /usr/local/bin/wgset && chmod +x /usr/local/bin/wgset  
+```
+安装完成后，你即可使用：  
+```
+wgset
+```
+进入 WireGuard 管理菜单 
