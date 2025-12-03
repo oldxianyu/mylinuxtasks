@@ -2,7 +2,7 @@
 set -e
 
 WG_UI_VERSION="v0.5.2"
-WG_UI_PORT="5000"
+WG_UI_PORT="51822"
 
 # 邮箱配置
 EMAIL_FROM_ADDRESS="admin@qq.com"
