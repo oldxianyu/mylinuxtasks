@@ -82,7 +82,12 @@ sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/oldxianyu/mylinuxta
 ### wireguard_install.sh 的使用  
 直接运行  
 ```
-curl -sSL https://raw.githubusercontent.com/oldxianyu/mylinuxtasks/main/wireguard_install.sh -o /usr/local/bin/wgset && chmod +x /usr/local/bin/wgset  
+curl -sSL https://raw.githubusercontent.com/oldxianyu/mylinuxtasks/main/wireguard_install.sh -o /usr/local/bin/wgset && chmod +x /usr/local/bin/wgset
+```
+
+国内加速
+```
+sudo bash -c "$(curl -fsSL 'https://github.502211.xyz/https://raw.githubusercontent.com/oldxianyu/mylinuxtasks/main/wgubuntu.sh')"
 ```
 安装完成后，你即可使用：  
 ```
